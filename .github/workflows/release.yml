@@ -67,7 +67,14 @@ jobs:
 
       - name: Create DMG
         run: |
-          hdiutil create -volname MDTool -srcfolder build/mdtool.app -ov -format UDZO mdtool.dmg
+          APP=$(find build -maxdepth 3 -name '*.app' | head -n1)
+          echo "Found app: $APP"
+          if [ -z "$APP" ]; then
+            echo "mdtool.app not found, build output:"
+            ls -R build | head -50
+            exit 1
+          fi
+          hdiutil create -volname MDTool -srcfolder "$APP" -ov -format UDZO mdtool.dmg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
