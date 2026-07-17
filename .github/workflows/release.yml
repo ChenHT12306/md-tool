@@ -33,13 +33,15 @@ jobs:
         run: |
           export PATH="$HOME/go/bin:$PATH"
           wails build
+          echo "Build output:"
+          ls -R build | head -80
         shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: build/mdtool.exe
+          path: build/**/mdtool.exe
 
   build-macos:
     name: Build macOS
