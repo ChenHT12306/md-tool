@@ -6,18 +6,42 @@ export function ExportFile(arg1, arg2) {
   return window['go']['main']['App']['ExportFile'](arg1, arg2);
 }
 
+export function GetPid() {
+  return window['go']['main']['App']['GetPid']();
+}
+
 export function GetStartupFile() {
   return window['go']['main']['App']['GetStartupFile']();
+}
+
+export function GetWindows() {
+  return window['go']['main']['App']['GetWindows']();
 }
 
 export function OpenFile() {
   return window['go']['main']['App']['OpenFile']();
 }
 
+export function OpenInNewWindow(arg1, arg2) {
+  return window['go']['main']['App']['OpenInNewWindow'](arg1, arg2);
+}
+
 export function OpenPath(arg1) {
   return window['go']['main']['App']['OpenPath'](arg1);
 }
 
+export function RegisterWindow(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RegisterWindow'](arg1, arg2, arg3, arg4);
+}
+
 export function SaveFile(arg1, arg2) {
   return window['go']['main']['App']['SaveFile'](arg1, arg2);
+}
+
+export function SendTabToWindow(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SendTabToWindow'](arg1, arg2, arg3);
+}
+
+export function UnregisterWindow() {
+  return window['go']['main']['App']['UnregisterWindow']();
 }

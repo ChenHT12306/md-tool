@@ -41,6 +41,99 @@ body {
   -webkit-app-region: drag;
 }
 
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  height: 38px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-app-region: no-drag;
+  -webkit-user-select: none;
+  user-select: none;
+  position: relative;
+  z-index: 10;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+  max-width: 220px;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tab:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tab:active {
+  cursor: grabbing;
+}
+
+body.dragging,
+body.dragging * {
+  cursor: grabbing !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.tab-ghost {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  padding: 6px 12px;
+  max-width: 220px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.95;
+  will-change: left, top;
+}
+
+.tab.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--primary);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.tab-close:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text);
+}
+
 .titlebar-left {
   display: flex;
   align-items: center;

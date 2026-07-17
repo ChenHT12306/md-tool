@@ -2,9 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -12,10 +18,43 @@ import (
 type App struct {
 	ctx         context.Context
 	startupFile string
+	uid         string
 }
+
+type windowEntry struct {
+	Pid int    `json:"pid"`
+	Uid string `json:"uid"`
+	X   int    `json:"x"`
+	Y   int    `json:"y"`
+	W   int    `json:"w"`
+	H   int    `json:"h"`
+	Ts  int64  `json:"ts"`
+}
+
+var (
+	windowsMu   sync.Mutex
+	windowsFile = filepath.Join(os.TempDir(), "mdtool_windows.json")
+)
 
 func NewApp() *App {
 	return &App{}
+}
+
+func loadWindows() map[string]windowEntry {
+	m := map[string]windowEntry{}
+	data, err := os.ReadFile(windowsFile)
+	if err == nil {
+		_ = json.Unmarshal(data, &m)
+	}
+	return m
+}
+
+func saveWindows(m map[string]windowEntry) error {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(windowsFile, data, 0644)
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -40,9 +79,90 @@ func (a *App) GetStartupFile() string {
 	return a.startupFile
 }
 
+// GetPid 返回当前进程 ID，供前端在窗口表中定位自身
+func (a *App) GetPid() int {
+	return os.Getpid()
+}
+
+// RegisterWindow 把当前窗口的位置/尺寸写入共享表（含自身 uid）
+func (a *App) RegisterWindow(x, y, w, h int) error {
+	windowsMu.Lock()
+	defer windowsMu.Unlock()
+	m := loadWindows()
+	m[strconv.Itoa(os.Getpid())] = windowEntry{
+		Pid: os.Getpid(), Uid: a.uid, X: x, Y: y, W: w, H: h, Ts: time.Now().Unix(),
+	}
+	return saveWindows(m)
+}
+
+// GetWindows 返回近期活跃窗口列表（剔除超过 2 秒未更新的残留项）
+func (a *App) GetWindows() []map[string]interface{} {
+	windowsMu.Lock()
+	defer windowsMu.Unlock()
+	m := loadWindows()
+	now := time.Now().Unix()
+	out := []map[string]interface{}{}
+	for _, e := range m {
+		if now-e.Ts > 2 {
+			continue
+		}
+		out = append(out, map[string]interface{}{
+			"pid": e.Pid, "uid": e.Uid, "x": e.X, "y": e.Y, "w": e.W, "h": e.H,
+		})
+	}
+	return out
+}
+
+// UnregisterWindow 关闭时从共享表移除自身
+func (a *App) UnregisterWindow() error {
+	windowsMu.Lock()
+	defer windowsMu.Unlock()
+	m := loadWindows()
+	delete(m, strconv.Itoa(os.Getpid()))
+	return saveWindows(m)
+}
+
 // OpenPath 读取指定路径的 Markdown 文件（供文件关联/双击打开使用）
 func (a *App) OpenPath(path string) (map[string]interface{}, error) {
 	return readMarkdown(path)
+}
+
+// OpenInNewWindow 把当前标签页在新窗口中打开：启动自身的新进程，
+// 若该标签页尚未保存则先把内容写入临时文件再传入路径。
+func (a *App) OpenInNewWindow(path string, content string) error {
+	target := path
+	if target == "" {
+		tmp := filepath.Join(os.TempDir(), fmt.Sprintf("mdtool-%d.md", time.Now().UnixNano()))
+		if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
+			return err
+		}
+		target = tmp
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(exe, "--new-window", target)
+	return cmd.Start()
+}
+
+// SendTabToWindow 把标签页发送到指定 uid 的窗口：启动自身新进程并携带
+// --target-uid，使其被目标窗口的单实例锁拦截，从而触发目标窗口合并该 tab。
+func (a *App) SendTabToWindow(targetUid string, path string, content string) error {
+	target := path
+	if target == "" {
+		tmp := filepath.Join(os.TempDir(), fmt.Sprintf("mdtool-%d.md", time.Now().UnixNano()))
+		if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
+			return err
+		}
+		target = tmp
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(exe, "--target-uid", targetUid, target)
+	return cmd.Start()
 }
 
 func readMarkdown(path string) (map[string]interface{}, error) {
