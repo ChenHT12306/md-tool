@@ -30,6 +30,16 @@ jobs:
           export PATH="$PATH:$(go env GOPATH)/bin"
           wails build
 
+      - name: Register .md file association
+        run: |
+          PLIST="build/bin/mdtool.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes array' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0 dict' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions array' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0 string md' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeName string MD Tool Document' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeRole string Editor' "$PLIST"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
