@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -224,6 +225,41 @@ func (a *App) SaveFile(content string, currentPath string) (map[string]interface
 		"path": file,
 		"name": filepath.Base(file),
 	}, nil
+}
+
+func (a *App) SaveImage(dir string, filename string, data string) (string, error) {
+	if dir == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		dir = wd
+	}
+	if i := strings.Index(data, ","); i >= 0 {
+		data = data[i+1:]
+	}
+	b, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", err
+	}
+	assetsDir := filepath.Join(dir, "assets")
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		return "", err
+	}
+	name := filepath.Base(filename)
+	out := filepath.Join(assetsDir, name)
+	for i := 1; ; i++ {
+		if _, err := os.Stat(out); err != nil {
+			break
+		}
+		ext := filepath.Ext(name)
+		base := strings.TrimSuffix(name, ext)
+		out = filepath.Join(assetsDir, fmt.Sprintf("%s_%d%s", base, i, ext))
+	}
+	if err := os.WriteFile(out, b, 0644); err != nil {
+		return "", err
+	}
+	return "assets/" + filepath.Base(out), nil
 }
 
 func (a *App) ExportFile(content string, ext string) error {

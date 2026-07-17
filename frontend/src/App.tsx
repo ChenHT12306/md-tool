@@ -22,6 +22,15 @@ const fileToDataURL = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+const dirOf = (path?: string): string =>
+  path ? path.replace(/[\\/][^\\/]*$/, '').replace(/\\/g, '/') : '';
+
+const toAbsImages = (md: string, dir: string): string =>
+  dir ? md.replace(/]\(assets\//g, `](file:///${dir}/assets/`) : md;
+
+const toRelImages = (md: string): string =>
+  md.replace(/]\(file:\/\/\/[^)]*?\/assets\//g, '](assets/');
+
 function App() {
   const editorRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe>();
@@ -79,8 +88,12 @@ function App() {
   const loadIntoEditor = useCallback(
     (content: string) => {
       loadingRef.current = true;
-      setContent(content);
-      setSourceContent(content);
+      const dir = dirOf(
+        tabsRef.current.find((t) => t.id === activeIdRef.current)?.path,
+      );
+      const display = toAbsImages(content, dir);
+      setContent(display);
+      setSourceContent(display);
       setViewMode('wysiwyg');
       setTimeout(() => {
         loadingRef.current = false;
@@ -251,7 +264,8 @@ function App() {
     const cur = tabsRef.current.find((t) => t.id === activeIdRef.current);
     if (!cur) return;
     try {
-      const content = await getMarkdown();
+      const raw = await getMarkdown();
+      const content = toRelImages(raw);
       const result = await window.go?.main?.App?.SaveFile(content, cur.path);
       if (result) {
         tabsRef.current = tabsRef.current.map((t) =>
@@ -306,7 +320,17 @@ function App() {
       defaultValue: '',
       featureConfigs: {
         [CrepeFeature.ImageBlock]: {
-          onUpload: fileToDataURL,
+          onUpload: async (file: File): Promise<string> => {
+            const dir = dirOf(
+              tabsRef.current.find((t) => t.id === activeIdRef.current)?.path,
+            );
+            if (!dir) return fileToDataURL(file);
+            const dataUrl = await fileToDataURL(file);
+            const b64 = dataUrl.split(',')[1] ?? '';
+            const rel = await (window.go as any)?.main?.App?.SaveImage(dir, file.name, b64);
+            if (!rel) return dataUrl;
+            return `file:///${dir}/${rel}`;
+          },
         },
       },
     });
