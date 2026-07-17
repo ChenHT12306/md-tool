@@ -1,0 +1,31 @@
+Windows Registry Editor Version 5.00
+
+; 将下面路径替换为你实际的 mdtool.exe 所在位置
+; 开发版示例: D:\dev\GolandProject\mdreview\build\mdtool.exe
+; 安装版示例: C:\Program Files\mdtool\mdtool.exe
+
+; .md 文件关联为 MD Tool（同时出现在右键「打开方式」列表）
+[HKEY_CLASSES_ROOT\.md]
+@="MDTool.mdfile"
+"Content Type"="text/markdown"
+"PerceivedType"="text"
+"OpenWithProgids"=hex(7):4d,00,44,00,54,00,6f,00,6f,00,6c,00,2e,00,6d,00,64,00,66,00,69,00,6c,00,65,00,00,00
+
+; .markdown 同样关联
+[HKEY_CLASSES_ROOT\.markdown]
+@="MDTool.mdfile"
+
+; 程序 ProgID：显示在「打开方式」中的友好名称
+[HKEY_CLASSES_ROOT\MDTool.mdfile]
+@="MD Tool 文档"
+
+[HKEY_CLASSES_ROOT\MDTool.mdfile\FriendlyTypeName]
+@="MD Tool 文档"
+
+; 资源管理器中 .md 文件显示的图标（使用程序自身图标）
+[HKEY_CLASSES_ROOT\MDTool.mdfile\DefaultIcon]
+@="\"D:\\dev\\GolandProject\\mdreview\\build\\mdtool.exe\",0"
+
+; 双击 / 右键打开时执行的命令（%1 为传入的文件路径）
+[HKEY_CLASSES_ROOT\MDTool.mdfile\shell\open\command]
+@="\"D:\\dev\\GolandProject\mdreview\\build\\mdtool.exe\" \"%1\""

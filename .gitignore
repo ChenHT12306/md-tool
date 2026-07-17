@@ -1,0 +1,11 @@
+node_modules/
+frontend/dist/
+frontend/node_modules/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+.DS_Store
+*.log
+build/
