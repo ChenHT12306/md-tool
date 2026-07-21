@@ -1,8 +1,70 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Crepe, CrepeFeature } from '@milkdown/crepe';
-import { replaceAll } from '@milkdown/kit/utils';
+import { replaceAll, $markSchema, $remark } from '@milkdown/kit/utils';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
+
+const highlightMark = $markSchema('highlight', () => ({
+  group: 'inline',
+  parseDOM: [{ tag: 'mark' }],
+  toDOM: () => ['mark', { class: 'highlight' }, 0],
+  parseMarkdown: {
+    match: (node: any) => node.type === 'mark',
+    runner: (state: any, node: any, type: any) => {
+      state.openMark(type);
+      state.addText(node.value ?? '');
+      state.closeMark(type);
+    },
+  },
+  toMarkdown: {
+    match: (mark: any) => mark.type.name === 'highlight',
+    runner: (state: any, _mark: any, node: any) => {
+      state.addNode('html', undefined, `<mark>${node.text ?? ''}</mark>`);
+      return true;
+    },
+  },
+}));
+
+const remarkMark = $remark('remark-mark', () => {
+  return (tree: any) => {
+    const walk = (node: any) => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node.children)) {
+        const out: any[] = [];
+        for (const child of node.children) {
+          if (child && child.type === 'text' && typeof child.value === 'string' && /==/.test(child.value)) {
+            const regex = /==([^=\n]+?)==/g;
+            let last = 0;
+            let m: RegExpExecArray | null;
+            while ((m = regex.exec(child.value)) !== null) {
+              if (m.index > last) {
+                out.push({ type: 'text', value: child.value.slice(last, m.index) });
+              }
+              out.push({ type: 'mark', value: m[1] });
+              last = regex.lastIndex;
+            }
+            if (last < child.value.length) {
+              out.push({ type: 'text', value: child.value.slice(last) });
+            }
+          } else if (child && child.type === 'html' && typeof child.value === 'string') {
+            const m = /^<mark>([\s\S]*?)<\/mark>$/.exec(child.value.trim());
+            if (m) {
+              out.push({ type: 'mark', value: m[1] });
+              continue;
+            }
+            walk(child);
+            out.push(child);
+          } else {
+            walk(child);
+            out.push(child);
+          }
+        }
+        node.children = out;
+      }
+    };
+    walk(tree);
+  };
+});
 
 interface Tab {
   id: string;
@@ -53,6 +115,8 @@ function App() {
   const pidRef = useRef<number>(0);
   const windowPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const windowsRef = useRef<Array<{ pid: number; uid: string; x: number; y: number; w: number; h: number }>>([]);
+  const fileMtimeRef = useRef<Record<string, number>>({});
+  const promptingRef = useRef(false);
 
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -192,6 +256,9 @@ function App() {
           loadIntoEditor('');
         }
       }
+      if (target.path) {
+        (window as any).go?.main?.App?.UnlockFile?.(target.path);
+      }
       tabsRef.current = remaining;
       setTabs(remaining);
       if (remaining.length === 0) {
@@ -260,13 +327,35 @@ function App() {
     setTabs(without);
   }, []);
 
+  const reloadTab = useCallback(
+    async (id: string) => {
+      const tab = tabsRef.current.find((t) => t.id === id);
+      if (!tab || !tab.path) return;
+      try {
+        const res = await (window as any).go?.main?.App?.ReadFile(tab.path);
+        if (!res) return;
+        tabsRef.current = tabsRef.current.map((t) =>
+          t.id === id ? { ...t, content: res.content, isModified: false } : t,
+        );
+        setTabs(tabsRef.current);
+        if (id === activeIdRef.current) loadIntoEditor(res.content);
+        const mt = await (window as any).go?.main?.App?.GetFileModTime(tab.path);
+        if (mt) fileMtimeRef.current[id] = mt;
+      } catch {
+        /* 读取失败忽略 */
+      }
+    },
+    [loadIntoEditor],
+  );
+
   const handleSave = useCallback(async () => {
     const cur = tabsRef.current.find((t) => t.id === activeIdRef.current);
     if (!cur) return;
     try {
       const raw = await getMarkdown();
       const content = toRelImages(raw);
-      const result = await window.go?.main?.App?.SaveFile(content, cur.path);
+      const path = cur.path;
+      const result = await (window as any).go?.main?.App?.SaveFile(content, path);
       if (result) {
         tabsRef.current = tabsRef.current.map((t) =>
           t.id === cur.id
@@ -274,6 +363,8 @@ function App() {
             : t,
         );
         setTabs(tabsRef.current);
+        const mt = await (window as any).go?.main?.App?.GetFileModTime(result.path);
+        if (mt) fileMtimeRef.current[cur.id] = mt;
       }
     } catch (e) {
       console.error('保存失败:', e);
@@ -335,6 +426,11 @@ function App() {
       },
     });
 
+    crepe.addFeature((editor: any) => {
+      editor.use(highlightMark);
+      editor.use(remarkMark);
+    });
+
     crepe.create().then(() => {
       crepeRef.current = crepe;
       crepe.on((api) => {
@@ -374,6 +470,10 @@ function App() {
     const off = w.runtime?.EventsOn?.('second-instance', (args: string[]) => {
       const path = (args || []).find((a) => /\.(md|markdown)$/i.test(a));
       if (!path) return;
+      w.runtime?.WindowShow?.();
+      w.runtime?.WindowSetAlwaysOnTop?.(true);
+      setTimeout(() => w.runtime?.WindowSetAlwaysOnTop?.(false), 200);
+      window.go?.main?.App?.FlashTaskbar?.(3);
       window.go?.main?.App?.OpenPath(path)
         .then((res: { content: string; path: string; name: string } | null) => {
           if (res) openFileInTab(res);
@@ -531,6 +631,50 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSave, handleOpen]);
+
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      if (promptingRef.current) return;
+      for (const t of tabsRef.current) {
+        if (!t.path) continue;
+        let mt: number | undefined;
+        try {
+          mt = await (window as any).go?.main?.App?.GetFileModTime(t.path);
+        } catch {
+          mt = undefined;
+        }
+        if (!mt) {
+          if (fileMtimeRef.current[t.id] !== -1) {
+            fileMtimeRef.current[t.id] = -1;
+            promptingRef.current = true;
+            window.confirm(
+              `文件 "${t.name}" 已被移动、重命名或删除。\n当前编辑内容仍保留，保存时将另存为新文件。`,
+            );
+            promptingRef.current = false;
+          }
+          continue;
+        }
+        const prev = fileMtimeRef.current[t.id];
+        if (!prev) {
+          fileMtimeRef.current[t.id] = mt;
+          continue;
+        }
+        if (prev !== -1 && prev !== mt) {
+          promptingRef.current = true;
+          const ok = window.confirm(
+            `文件 "${t.name}" 已在外部被修改。\n\n点"确定"重新加载最新内容；点"取消"保留当前编辑内容。`,
+          );
+          promptingRef.current = false;
+          if (ok) {
+            await reloadTab(t.id);
+          } else {
+            fileMtimeRef.current[t.id] = mt;
+          }
+        }
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [reloadTab]);
 
   return (
     <div className="app">

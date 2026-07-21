@@ -3,6 +3,12 @@
 
 export function ExportFile(arg1:string,arg2:string):Promise<void>;
 
+export function FileExists(arg1:string):Promise<boolean>;
+
+export function FlashTaskbar(arg1:number):Promise<void>;
+
+export function GetFileModTime(arg1:string):Promise<number>;
+
 export function GetPid():Promise<number>;
 
 export function GetStartupFile():Promise<string>;
@@ -15,10 +21,16 @@ export function OpenInNewWindow(arg1:string,arg2:string):Promise<void>;
 
 export function OpenPath(arg1:string):Promise<Record<string, any>>;
 
+export function ReadFile(arg1:string):Promise<Record<string, any>>;
+
 export function RegisterWindow(arg1:number,arg2:number,arg3:number,arg4:number):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<Record<string, any>>;
 
+export function SaveImage(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function SendTabToWindow(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function UnlockFile(arg1:string):Promise<void>;
 
 export function UnregisterWindow():Promise<void>;

@@ -10,6 +10,8 @@ interface WailsApp {
   SendTabToWindow(targetUid: string, path: string, content: string): Promise<void>;
   SaveFile(content: string, currentPath: string): Promise<{ path: string; name: string } | null>;
   ExportFile(content: string, ext: string): Promise<void>;
+  FlashTaskbar(count: number): Promise<void>;
+  UnlockFile(path: string): Promise<void>;
 }
 
 interface Window {

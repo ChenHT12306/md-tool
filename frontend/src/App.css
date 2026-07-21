@@ -285,8 +285,8 @@ body.dragging * {
 }
 
 .editor-wrapper .ProseMirror pre {
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: #0d1117 !important;
+  color: #e6edf3 !important;
   padding: 16px;
   border-radius: 8px;
   overflow-x: auto;
@@ -295,15 +295,69 @@ body.dragging * {
 }
 
 .editor-wrapper .ProseMirror code {
-  background: #f1f5f9;
+  background: var(--bg-secondary) !important;
+  color: var(--primary) !important;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
 }
 
 .editor-wrapper .ProseMirror pre code {
-  background: transparent;
+  background: transparent !important;
   padding: 0;
+  color: #e6edf3 !important;
+}
+
+/* Crepe 代码块（CodeMirror）黑底高对比 */
+.milkdown .code-block,
+.milkdown [data-node-type='code-block'],
+.milkdown [data-type='codeBlock'],
+.milkdown .ProseMirror .code-block {
+  background: #0d1117 !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.milkdown .cm-editor {
+  background: #0d1117 !important;
+}
+
+.milkdown .cm-editor .cm-gutters {
+  background: #161b22 !important;
+  color: #6b6b6b !important;
+  border-right: none !important;
+}
+
+.milkdown .cm-content {
+  color: #e6edf3 !important;
+}
+
+.milkdown .cm-editor .cm-line {
+  color: #e6edf3 !important;
+}
+
+.milkdown .cm-editor .cm-cursor {
+  border-left-color: #e6edf3 !important;
+}
+
+/* <mark> 高亮 */
+mark,
+.editor-wrapper mark,
+.editor-wrapper .ProseMirror mark,
+.editor-wrapper .ProseMirror .highlight,
+.milkdown mark,
+.milkdown .highlight,
+.editor-wrapper .ProseMirror span.highlight,
+.milkdown span.highlight,
+.milkdown span[data-mark],
+.milkdown [data-type='highlight'] {
+  background: #e0e7ff !important;
+  color: #4f46e5 !important;
+  padding: 0 4px !important;
+  border-radius: 3px !important;
+  font-weight: 500;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .editor-wrapper .ProseMirror table {

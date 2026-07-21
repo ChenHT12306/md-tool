@@ -35,7 +35,41 @@ type windowEntry struct {
 var (
 	windowsMu   sync.Mutex
 	windowsFile = filepath.Join(os.TempDir(), "mdtool_windows.json")
+
+	lockMu    sync.Mutex
+	lockFiles = map[string]*os.File{}
 )
+
+func lockFile(path string) {
+	lockMu.Lock()
+	defer lockMu.Unlock()
+	if _, ok := lockFiles[path]; ok {
+		return
+	}
+	f, err := lockFileOpen(path)
+	if err != nil {
+		return
+	}
+	lockFiles[path] = f
+}
+
+func unlockFile(path string) {
+	lockMu.Lock()
+	defer lockMu.Unlock()
+	if f, ok := lockFiles[path]; ok {
+		f.Close()
+		delete(lockFiles, path)
+	}
+}
+
+func unlockAllFiles() {
+	lockMu.Lock()
+	defer lockMu.Unlock()
+	for p, f := range lockFiles {
+		f.Close()
+		delete(lockFiles, p)
+	}
+}
 
 func NewApp() *App {
 	return &App{}
@@ -114,8 +148,9 @@ func (a *App) GetWindows() []map[string]interface{} {
 	return out
 }
 
-// UnregisterWindow 关闭时从共享表移除自身
+// UnregisterWindow 关闭时从共享表移除自身并释放所有文件锁
 func (a *App) UnregisterWindow() error {
+	unlockAllFiles()
 	windowsMu.Lock()
 	defer windowsMu.Unlock()
 	m := loadWindows()
@@ -171,6 +206,7 @@ func readMarkdown(path string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	lockFile(path)
 	return map[string]interface{}{
 		"path":    path,
 		"content": string(content),
@@ -225,6 +261,26 @@ func (a *App) SaveFile(content string, currentPath string) (map[string]interface
 		"path": file,
 		"name": filepath.Base(file),
 	}, nil
+}
+
+// GetFileModTime 返回文件修改时间（纳秒），文件不存在返回 0
+func (a *App) GetFileModTime(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.ModTime().UnixNano()
+}
+
+// ReadFile 按路径读取 Markdown 文件内容
+func (a *App) ReadFile(path string) (map[string]interface{}, error) {
+	return readMarkdown(path)
+}
+
+// FileExists 判断文件是否存在
+func (a *App) FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (a *App) SaveImage(dir string, filename string, data string) (string, error) {
@@ -283,4 +339,12 @@ func (a *App) ExportFile(content string, ext string) error {
 	}
 
 	return os.WriteFile(file, []byte(content), 0644)
+}
+
+func (a *App) FlashTaskbar(count int) {
+	_ = flashTaskbar(uint32(count))
+}
+
+func (a *App) UnlockFile(path string) {
+	unlockFile(path)
 }

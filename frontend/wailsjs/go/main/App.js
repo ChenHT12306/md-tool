@@ -6,6 +6,18 @@ export function ExportFile(arg1, arg2) {
   return window['go']['main']['App']['ExportFile'](arg1, arg2);
 }
 
+export function FileExists(arg1) {
+  return window['go']['main']['App']['FileExists'](arg1);
+}
+
+export function FlashTaskbar(arg1) {
+  return window['go']['main']['App']['FlashTaskbar'](arg1);
+}
+
+export function GetFileModTime(arg1) {
+  return window['go']['main']['App']['GetFileModTime'](arg1);
+}
+
 export function GetPid() {
   return window['go']['main']['App']['GetPid']();
 }
@@ -30,6 +42,10 @@ export function OpenPath(arg1) {
   return window['go']['main']['App']['OpenPath'](arg1);
 }
 
+export function ReadFile(arg1) {
+  return window['go']['main']['App']['ReadFile'](arg1);
+}
+
 export function RegisterWindow(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['RegisterWindow'](arg1, arg2, arg3, arg4);
 }
@@ -38,8 +54,16 @@ export function SaveFile(arg1, arg2) {
   return window['go']['main']['App']['SaveFile'](arg1, arg2);
 }
 
+export function SaveImage(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveImage'](arg1, arg2, arg3);
+}
+
 export function SendTabToWindow(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendTabToWindow'](arg1, arg2, arg3);
+}
+
+export function UnlockFile(arg1) {
+  return window['go']['main']['App']['UnlockFile'](arg1);
 }
 
 export function UnregisterWindow() {
