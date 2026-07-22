@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Crepe, CrepeFeature } from '@milkdown/crepe';
 import { replaceAll, $markSchema, $remark } from '@milkdown/kit/utils';
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
+import { editorViewCtx } from '@milkdown/kit/core';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
 
@@ -123,8 +125,41 @@ function App() {
   const [viewMode, setViewMode] = useState<'wysiwyg' | 'source'>('wysiwyg');
   const [sourceContent, setSourceContent] = useState('');
   const [ghost, setGhost] = useState<{ name: string; x: number; y: number } | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [themeColor, setThemeColor] = useState(() => localStorage.getItem('themeColor') || '#4f46e5');
+  const [findOpen, setFindOpen] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [findIndex, setFindIndex] = useState(0);
+  const [findCount, setFindCount] = useState(0);
+  const findInputRef = useRef<HTMLInputElement>(null);
+  const findDecoRef = useRef<DecorationSet | null>(null);
+  const findMatchesRef = useRef<{ from: number; to: number }[]>([]);
 
   const activeTab = tabs.find((t) => t.id === activeId) || null;
+
+  const applyTheme = useCallback((color: string) => {
+    const darken = (c: string, amt: number) => {
+      const r = Math.max(0, parseInt(c.slice(1, 3), 16) - amt);
+      const g = Math.max(0, parseInt(c.slice(3, 5), 16) - amt);
+      const b = Math.max(0, parseInt(c.slice(5, 7), 16) - amt);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    };
+    const lighten = (c: string, amt: number) => {
+      const r = Math.min(255, parseInt(c.slice(1, 3), 16) + amt);
+      const g = Math.min(255, parseInt(c.slice(3, 5), 16) + amt);
+      const b = Math.min(255, parseInt(c.slice(5, 7), 16) + amt);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    };
+    const root = document.documentElement;
+    root.style.setProperty('--primary', color);
+    root.style.setProperty('--primary-hover', darken(color, 20));
+    root.style.setProperty('--primary-light', lighten(color, 55));
+    localStorage.setItem('themeColor', color);
+  }, []);
+
+  useEffect(() => {
+    applyTheme(themeColor);
+  }, [themeColor, applyTheme]);
 
   const setActive = useCallback((id: string | null) => {
     activeIdRef.current = id;
@@ -402,6 +437,99 @@ function App() {
     }
   }, [viewMode, sourceContent, getMarkdown, setContent, patchActive]);
 
+  const getView = useCallback(() => {
+    const crepe = crepeRef.current;
+    if (!crepe) return null;
+    try {
+      let v: any = null;
+      crepe.editor.action((ctx: any) => { v = ctx.get(editorViewCtx); });
+      return v;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const applyFind = useCallback((query: string, index: number) => {
+    const view = getView();
+    if (!view) return;
+    const doc = view.state.doc;
+    const positions: number[] = [];
+    let text = '';
+    let pendingNewline = false;
+    doc.nodesBetween(0, doc.content.size, (node: any, pos: number) => {
+      if (node.isText && node.text) {
+        if (pendingNewline) { text += '\n'; positions.push(pos); pendingNewline = false; }
+        for (let i = 0; i < node.text.length; i++) {
+          positions.push(pos + i);
+          text += node.text[i];
+        }
+      } else if (node.isBlock && node.childCount > 0) {
+        pendingNewline = true;
+      }
+      return true;
+    });
+    const matches: { from: number; to: number }[] = [];
+    if (query) {
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escaped, 'gi');
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        const s = m.index;
+        const e = m.index + m[0].length;
+        if (e > positions.length) break;
+        matches.push({ from: positions[s], to: positions[e - 1] + 1 });
+        if (m[0].length === 0) re.lastIndex++;
+      }
+    }
+    findMatchesRef.current = matches;
+    setFindCount(matches.length);
+    const idx = matches.length ? Math.max(0, Math.min(index, matches.length - 1)) : 0;
+    const decos = DecorationSet.create(
+      doc,
+      matches.map((mt, i) =>
+        Decoration.inline(mt.from, mt.to, {
+          class: i === idx ? 'find-match-current' : 'find-match',
+        }),
+      ),
+    );
+    findDecoRef.current = decos;
+    view.setProps({ decorations: () => findDecoRef.current });
+    if (matches[idx]) {
+      try {
+        const dom = view.domAtPos(matches[idx].from);
+        const node = dom.node;
+        const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
+        el?.scrollIntoView({ block: 'center' });
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [getView]);
+
+  const goNext = useCallback(() => {
+    setFindIndex((i) => {
+      const c = findMatchesRef.current.length;
+      return c ? (i + 1) % c : 0;
+    });
+  }, []);
+
+  const goPrev = useCallback(() => {
+    setFindIndex((i) => {
+      const c = findMatchesRef.current.length;
+      return c ? (i - 1 + c) % c : 0;
+    });
+  }, []);
+
+  const closeFind = useCallback(() => {
+    setFindOpen(false);
+    findDecoRef.current = DecorationSet.empty;
+    const view = getView();
+    if (view) view.setProps({ decorations: () => findDecoRef.current });
+    try { getView()?.focus(); } catch {
+      /* ignore */
+    }
+  }, [getView]);
+
   useEffect(() => {
     const container = editorRef.current;
     if (!container) return;
@@ -470,10 +598,13 @@ function App() {
     const off = w.runtime?.EventsOn?.('second-instance', (args: string[]) => {
       const path = (args || []).find((a) => /\.(md|markdown)$/i.test(a));
       if (!path) return;
-      w.runtime?.WindowShow?.();
-      w.runtime?.WindowSetAlwaysOnTop?.(true);
-      setTimeout(() => w.runtime?.WindowSetAlwaysOnTop?.(false), 200);
-      window.go?.main?.App?.FlashTaskbar?.(3);
+      const visibleOnDesktop = document.visibilityState === 'visible';
+      if (!visibleOnDesktop) {
+        w.runtime?.WindowShow?.();
+        w.runtime?.WindowSetAlwaysOnTop?.(true);
+        setTimeout(() => w.runtime?.WindowSetAlwaysOnTop?.(false), 200);
+      }
+      window.go?.main?.App?.FlashTaskbar?.(1);
       window.go?.main?.App?.OpenPath(path)
         .then((res: { content: string; path: string; name: string } | null) => {
           if (res) openFileInTab(res);
@@ -618,6 +749,17 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!showColorPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.color-picker-dropdown, .toolbar-btn[title="主题色"]')) {
+        setShowColorPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showColorPicker]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
@@ -627,10 +769,25 @@ function App() {
         e.preventDefault();
         handleOpen();
       }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setFindOpen(true);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSave, handleOpen]);
+
+  useEffect(() => {
+    if (!findOpen) return;
+    const t = setTimeout(() => findInputRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [findOpen]);
+
+  useEffect(() => {
+    if (!findOpen) return;
+    applyFind(findText, findIndex);
+  }, [findOpen, findText, findIndex, applyFind]);
 
   useEffect(() => {
     const timer = setInterval(async () => {
@@ -725,6 +882,28 @@ function App() {
             </button>
           </div>
           <div className="toolbar-divider" />
+          <div className="toolbar-group" style={{ position: 'relative' }}>
+            <button className="toolbar-btn" onClick={() => setShowColorPicker(!showColorPicker)} title="主题色">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="5" fill={themeColor} stroke={themeColor} />
+                <line x1="12" y1="1" x2="12" y2="4" /><line x1="12" y1="20" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="6.34" y2="6.34" /><line x1="17.66" y1="17.66" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="4" y2="12" /><line x1="20" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="6.34" y2="17.66" /><line x1="17.66" y1="6.34" x2="19.78" y2="4.22" />
+              </svg>
+            </button>
+            {showColorPicker && (
+              <div className="color-picker-dropdown">
+                <div className="color-presets">
+                  {['#4f46e5','#2563eb','#059669','#d94f30','#d97706','#7c3aed','#ec4899','#0891b2'].map((c) => (
+                    <div key={c} className="color-swatch" style={{ background: c }} onClick={() => { setThemeColor(c); setShowColorPicker(false); }} />
+                  ))}
+                </div>
+                <input type="color" className="color-input" value={themeColor} onChange={(e) => { setThemeColor(e.target.value); setShowColorPicker(false); }} title="自定义" />
+              </div>
+            )}
+          </div>
+          <div className="toolbar-divider" />
           <div className="toolbar-group">
             <button
               className={'toolbar-btn' + (viewMode === 'source' ? ' active' : '')}
@@ -795,6 +974,26 @@ function App() {
       )}
 
       <div className="editor-container">
+        {findOpen && (
+          <div className="find-bar">
+            <input
+              ref={findInputRef}
+              className="find-input"
+              value={findText}
+              onChange={(e) => { setFindText(e.target.value); setFindIndex(0); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); goNext(); }
+                else if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+                else if (e.key === 'F3') { e.preventDefault(); e.shiftKey ? goPrev() : goNext(); }
+              }}
+              placeholder="查找内容…"
+            />
+            <span className="find-count">{findCount ? `${findIndex + 1}/${findCount}` : '0/0'}</span>
+            <button className="find-btn" onClick={goPrev} title="上一个 (Shift+F3)">↑</button>
+            <button className="find-btn" onClick={goNext} title="下一个 (F3)">↓</button>
+            <button className="find-btn" onClick={closeFind} title="关闭 (Esc)">×</button>
+          </div>
+        )}
         <div
           className="editor-wrapper"
           ref={editorRef}

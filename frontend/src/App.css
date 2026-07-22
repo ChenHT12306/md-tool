@@ -12,6 +12,7 @@
   --border: #e5e7eb;
   --primary: #4f46e5;
   --primary-hover: #4338ca;
+  --primary-light: #e0e7ff;
   --titlebar-h: 56px;
   --statusbar-h: 32px;
 }
@@ -209,7 +210,7 @@ body.dragging * {
 }
 
 .toolbar-btn.active {
-  background: var(--text);
+  background: var(--primary);
   color: #fff;
 }
 
@@ -218,6 +219,7 @@ body.dragging * {
   overflow: hidden;
   display: flex;
   justify-content: stretch;
+  position: relative;
 }
 
 .editor-wrapper {
@@ -351,8 +353,8 @@ mark,
 .milkdown span.highlight,
 .milkdown span[data-mark],
 .milkdown [data-type='highlight'] {
-  background: #e0e7ff !important;
-  color: #4f46e5 !important;
+  background: color-mix(in srgb, var(--primary) 18%, #fff 82%) !important;
+  color: var(--primary) !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-weight: 500;
@@ -416,6 +418,158 @@ mark,
 
 .author-info a:hover {
   text-decoration: underline;
+}
+
+.color-picker-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 8px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.color-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.color-swatch:hover {
+  border-color: var(--border);
+}
+.color-input {
+  width: 100%;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+}
+
+/* 任务列表勾选框跟随主题色 */
+.editor-wrapper .ProseMirror input[type='checkbox'],
+.milkdown input[type='checkbox'],
+.editor-wrapper input[type='checkbox'] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  border: 2px solid var(--border) !important;
+  border-radius: 4px !important;
+  background: var(--bg) !important;
+  cursor: pointer !important;
+  vertical-align: middle !important;
+  margin-right: 6px !important;
+  position: relative !important;
+  flex: none !important;
+}
+
+.editor-wrapper .ProseMirror input[type='checkbox']:checked,
+.milkdown input[type='checkbox']:checked,
+.editor-wrapper input[type='checkbox']:checked {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.editor-wrapper .ProseMirror input[type='checkbox']:checked::after,
+.milkdown input[type='checkbox']:checked::after,
+.editor-wrapper input[type='checkbox']:checked::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 0px !important;
+  width: 4px !important;
+  height: 8px !important;
+  border: solid #fff !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(45deg) !important;
+}
+
+/* 选中区域跟随主题色 */
+::selection {
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+.editor-wrapper ::selection,
+.milkdown ::selection,
+.cm-editor ::selection {
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+/* 查找匹配高亮 */
+.find-match {
+  background: color-mix(in srgb, var(--primary) 22%, #fff 78%);
+  border-radius: 2px;
+}
+.find-match-current {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+/* 查找栏 */
+.find-bar {
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.find-input {
+  flex: 1;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.find-input:focus {
+  border-color: var(--primary);
+}
+.find-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: center;
+}
+.find-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 2px 9px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.find-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* Crepe 编辑器内部样式调整 */
